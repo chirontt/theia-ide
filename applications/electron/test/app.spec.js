@@ -9,6 +9,13 @@ const THEIA_LOAD_TIMEOUT = 15000; // 15 seconds
 // Set environment variable to disable splash screen (works with asar packaging)
 process.env.THEIA_NO_SPLASH = '1';
 
+function isLinuxArm() {
+    if (os.platform() !== 'linux') {
+        return false;
+    }
+    return os.arch() === 'arm64';
+}
+
 function isMacArm() {
   if (os.platform() !== 'darwin') {
     return false;
@@ -23,19 +30,28 @@ function isMacArm() {
   }
 }
 
+function isWinArm() {
+    if (os.platform() !== 'win32') {
+        return false;
+    }
+    return os.arch() === 'arm64';
+}
+
 function getBinaryPath() {
   const distFolder = path.join(__dirname, '..', 'dist');
   switch (os.platform()) {
     case 'linux':
+      const linuxFolder = isLinuxArm() ? 'linux-arm64' : 'linux';
       return path.join(
         distFolder,
-        'linux-unpacked',
+        `${linuxFolder}-unpacked`,
         'theia-ide-electron-app'
       );
     case 'win32':
+      const winFolder = isWinArm() ? 'win-arm64' : 'win';
       return path.join(
         distFolder,
-        'win-unpacked',
+        `${winFolder}-unpacked`,
         'TheiaIDE.exe'
       );
     case 'darwin':
