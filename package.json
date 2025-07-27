@@ -79,12 +79,11 @@
     "theia-extensions/*"
   ],
   "resolutions": {
+    "@electron/node-gyp": "github:nodejs/node-gyp#3cff85955e6ec8973fc6703ed937313b30bc0093",
     "@types/puppeteer": "^5.4.0",
-    "@yarnpkg/parsers": "3.0.0-rc.44",
-    "**/multer": "1.4.4-lts.1",
+    "**/buildcheck": "0.0.7",
     "**/nan": "2.23.0",
-    "**/cpu-features": "0.0.9",
-    "**/perfect-scrollbar": "1.5.5",
-    "**/node-abi": "4.14.0"
+    "**/node-abi": "4.14.0",
+    "**/perfect-scrollbar": "1.5.5"
   }
 }
