@@ -1,0 +1,119 @@
+name: Arm64 build, package and test (Windows, Linux)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.os }}, Node.js v${{ matrix.node }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-11-arm, ubuntu-22.04-arm] # macOS is excluded
+        node: ["22.x"]
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # To fetch all history for all branches and tags. (Will be required for caching with lerna: https://github.com/markuplint/markuplint/pull/111)
+
+      - name: Use Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Use Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install the Ruby 'fpm' program in Linux (for application packaging later)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y ruby ruby-dev
+          sudo gem install fpm
+
+      - name: Update electron-builder.yml (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          sed -i 's|https://download.eclipse.org/theia/ide/${version}/windows|https://download.eclipse.org/theia/ide/${version}/windows-arm|g' applications/electron/electron-builder.yml
+
+      - name: Update electron-builder.yml (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sed -i 's|https://download.eclipse.org/theia/ide/latest/linux|https://download.eclipse.org/theia/ide/latest/linux-arm|g' applications/electron/electron-builder.yml
+
+      - name: Build dev package (Windows, Linux)
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          yarn --skip-integrity-check --network-timeout 100000
+          yarn build:dev
+          yarn download:plugins
+          yarn package:applications:preview
+        env:
+          NODE_OPTIONS: --max_old_space_size=4096
+
+      - name: Build prod package (Windows)
+        if: runner.os == 'Windows' && github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          yarn --skip-integrity-check --network-timeout 100000
+          yarn build
+          yarn download:plugins
+          yarn package:applications
+        env:
+          NODE_OPTIONS: --max_old_space_size=4096
+
+      - name: Build prod package (Linux)
+        if: runner.os == 'Linux' && github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          yarn --skip-integrity-check --network-timeout 100000
+          yarn build
+          yarn download:plugins
+          yarn package:applications
+        env:
+          NODE_OPTIONS: --max_old_space_size=4096
+          USE_SYSTEM_FPM: true
+
+      - name: Upload Linux Dist Files
+        if: runner.os == 'Linux' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 #4.6.1
+        with:
+          name: ${{ runner.os }}-arm64
+          path: |
+            applications/electron/dist/**
+
+      - name: Upload Windows Dist Files
+        if: runner.os == 'Windows' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 #4.6.1
+        with:
+          name: ${{ runner.os }}-arm64
+          path: |
+            applications/electron/dist/**
+
+      - name: Test (Linux)
+        if: matrix.tests != 'skip' && runner.os == 'Linux'
+        run: |
+          xvfb-run -a yarn electron test
+
+      - name: Test (Windows)
+        if: matrix.tests != 'skip' && runner.os == 'Windows'
+        shell: bash
+        run: |
+          yarn electron test
+
+      - name: Lint
+        if: matrix.tests != 'skip'
+        shell: bash
+        run: |
+          yarn lint
